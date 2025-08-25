@@ -25,7 +25,10 @@ def check_ifreal(y: pd.Series) -> bool:
 
 def entropy(Y: pd.Series) -> float:
     """
-    Function to calculate the entropy
+    Function to calculate the entropy of a target variable Y.
+    Entropy measures the impurity or uncertainty in the dataset.
+
+    Formula: H(Y) = - Σ p_i * log2(p_i)
     """
 
     # get unique class values and their counts
@@ -40,10 +43,20 @@ def entropy(Y: pd.Series) -> float:
 
 def gini_index(Y: pd.Series) -> float:
     """
-    Function to calculate the gini index
+    Function to calculate the Gini Index of a target variable Y.
+    Gini Index measures impurity based on squared probabilities.
+
+    Formula: Gini(Y) = 1 - Σ p_i^2
     """
 
-    pass
+    # get unique class values and their counts
+    values, counts = np.unique(Y, return_counts=True)
+
+    # calculate probabilities for each class
+    probabilities = counts / counts.sum()
+
+    # apply gini formula
+    return 1 - np.sum(probabilities**2)
 
 
 def information_gain(Y: pd.Series, attr: pd.Series, criterion: str) -> float:
