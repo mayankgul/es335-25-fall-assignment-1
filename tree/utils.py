@@ -4,6 +4,8 @@ There is no restriction on following the below template, these fucntions are her
 """
 
 import pandas as pd
+import numpy as np
+
 
 def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
     """
@@ -11,6 +13,7 @@ def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
     """
 
     pass
+
 
 def check_ifreal(y: pd.Series) -> bool:
     """
@@ -25,7 +28,14 @@ def entropy(Y: pd.Series) -> float:
     Function to calculate the entropy
     """
 
-    pass
+    # get unique class values and their counts
+    values, counts = np.unique(Y, return_counts=True)
+
+    # calculate probabilities for each class
+    probabilities = counts / counts.sum()
+
+    # apply entropy formula
+    return -np.sum(probabilities * np.log2(probabilities))
 
 
 def gini_index(Y: pd.Series) -> float:
