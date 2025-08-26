@@ -71,6 +71,20 @@ def gini_index(Y: pd.Series) -> float:
     return 1 - np.sum(probabilities**2)
 
 
+def mse(Y: pd.Series) -> float:
+    """
+    function to calculate mean squared error
+
+    Parameters:
+        Y : pd.Series -> target variable
+
+    Returns:
+        float -> mean squared error
+    """
+
+    return np.mean((Y - np.mean(Y)) ** 2)
+
+
 def information_gain(
     Y: pd.Series, attr: pd.Series, criterion: str = "entropy"
 ) -> float:
@@ -99,7 +113,7 @@ def information_gain(
         case "mse":
             mean_val = np.mean(Y)
             base_impurity = np.mean((Y - mean_val) ** 2)
-            impurity_func = lambda subset: np.mean((subset - np.mean(subset)) ** 2)
+            impurity_func = mse
         case _:
             raise ValueError("Criterion must be one of ['entropy', 'gini', 'mse']")
 
