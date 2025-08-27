@@ -5,7 +5,7 @@ There is no restriction on following the below template, these fucntions are her
 
 import pandas as pd
 import numpy as np
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any
 
 
 def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
@@ -402,19 +402,93 @@ def opt_split_attribute(X: pd.DataFrame, y: pd.Series, criterion, features: pd.S
     return best_feature, best_threshold, float(best_gain)
 
 
-
-def split_data(X: pd.DataFrame, y: pd.Series, attribute, value):
+# helper function to check if an object is an iterable except str
+def is_iterable_not_str(obj: Any) -> bool:
     """
-    Funtion to split the data according to an attribute.
-    If needed you can split this function into 2, one for discrete and one for real valued features.
-    You can also change the parameters of this function according to your implementation.
+    function to find if an object is an iterable (except a string)
 
-    attribute: attribute/feature to split upon
-    value: value of that attribute to split upon
+    Parameters:
+        obj : Any -> object to check for
 
-    return: splitted data(Input and output)
+    Returns:
+        bool -> True if an object is an iterable except a string, False otherwise
     """
 
-    # Split the data based on a particular value of a particular attribute. You may use masking as a tool to split the data.
+    if isinstance(obj, (str, bytes)):
+        return False
 
-    pass
+    try:
+        iter(obj)
+        return True
+    except TypeError:
+        return False
+
+
+def split_data(X: pd.DataFrame, y: pd.Series, attribute: str, value: Any) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+    """
+    function to split the data according to the given attribute
+
+    Parameters:
+        X : pd.DataFrame -> input data
+        y : pd.Series -> target values
+        attribute : str -> column in X to split from
+        value : Any -> for real valued features = numeric threshold
+                       for discrete features = a single category
+    """
+
+    # check if attribute is present in the dataframe
+    if attribute not in X.columns:
+        raise KeyError(f"Attribute '{attribute}' not present in the dataframe")
+
+    feature_values = X[attribute]
+
+    # check for discrete or real type
+    is_real = check_ifreal(feature_values)
+
+    # we do not consider rows where either one of the values is NaN
+    valid_rows = feature_values.notna() & y.notna()
+
+    # consider real and discrete values separately
+    if is_real:
+        if value is None:
+            raise ValueError(
+                f"Real-valued split on '{attribute}' requires a threshold value"
+            )
+
+        try:
+            threshold = float(value)
+        except Exception as e:
+            raise ValueError(
+                f"Threshold value for real feature '{attribute}' must be numeric"
+            ) from e
+
+        feature_values_new = feature_values[valid_rows]
+        y_new = y[valid_rows]
+
+        left = feature_values_new <= threshold
+        right = feature_values_new > threshold
+
+        X_left, y_left = X.loc[left.index[left]], y_new[left]
+        X_right, y_right = X.loc[right.index[right]], y_new[right]
+
+        return X_left, y_left, X_right, y_right
+
+    else:
+        if value is None:
+            raise ValueError(f"Discrete-valued split on '{attribute}' requires a category value")
+
+        feature_values_new = feature_values[valid_rows]
+        y_new = y[valid_rows]
+
+        # Binary split on a single category or a group of categories
+        if is_iterable_not_str(value):
+            left = feature_values_new.isin(set(value))
+        else:
+            left = feature_values_new == value
+
+        right = (~left) & feature_values_new.notna()
+
+        X_left, y_left = X.loc[left.index[left]], y_new[left]
+        X_right, y_right = X.loc[right.index[right]], y_new[right]
+
+        return X_left, y_left, X_right, y_right
