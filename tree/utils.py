@@ -9,24 +9,126 @@ import numpy as np
 
 def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
     """
-    Function to perform one hot encoding on the input data
+    function to perform one hot encoding on the input data
+
+    Parameters:
+        X : pd.DataFrame -> input data
+
+    Returns:
+        pd.DataFrame -> one-hot encoded data
     """
 
-    pass
+    df = X.copy()
+    rows_count = len(df)
+
+    # we again use the threshold that we defined earlier
+    threshold = max(10, int(0.1 * rows_count))
+
+    # prepare an empty dataframe
+    parts = []
+
+    # we start iterating through the columns and one-hot encode them
+    for column in df.columns:
+        row = df[column]
+
+        # following the example from class, we consider boolean values as discrete -> one-hot encode them
+        if pd.api.types.is_bool_dtype(row):
+            dummies = pd.get_dummies(row.astype("category"), prefix=column, prefix_sep="__", dummy_na=True)
+            parts.append(dummies)
+            continue
+
+        # floating point values are considered real
+        if pd.api.types.is_float_dtype(row):
+            parts.append(row.astype(float).to_frame(column))
+            continue
+
+        # we use our threshold value to decide if integer values are discrete or real
+        if pd.api.types.is_integer_dtype(row):
+            unique_count = row.dropna().nunique()
+            if unique_count < threshold:
+                dummies = pd.get_dummies(row.astype("category"), prefix=column, prefix_sep="__", dummy_na=True)
+                parts.append(dummies)
+            else:
+                parts.append(row.astype(float).to_frame(column))
+
+            continue
+
+        # everything else is also discrete
+        dummies = pd.get_dummies(row.astype("category"), prefix=column, prefix_sep="__", dummy_na=True)
+        parts.append(dummies)
+
+        final = pd.concat(parts, axis=1)
+
+        return final.astype(float)
+
+
+
+def numeric_is_real(y: pd.Series) -> bool:
+    """
+    helper function for check_ifreal to check if a numeric series is real or discrete
+
+    Parameters:
+        y : pd.Series -> numeric series
+
+    Returns:
+        bool -> True if series has real values, False otherwise
+    """
+
+    # if the values in the series are floating point, we consider it as real
+    if pd.api.types.is_float_dtype(y):
+        return True
+
+    length = len(y)
+    unique_length = y.nunique()
+
+    # if the values are integers or any other numerical type, we check if most of the values are integers
+    # if more than 10 values or more than 10% of values are numerical, return True
+    threshold = max(10, int(0.1 * length))
+
+    return unique_length > threshold
 
 
 def check_ifreal(y: pd.Series) -> bool:
     """
     Function to check if the given series has real or discrete values
+
+    Parameters:
+        y : pd.Series -> the series to check for
+
+    Returns:x
+        bool -> True if the series has real (continuous) values, False otherwise
     """
 
-    pass
+    # we first remove the NaN values from the series
+    y_new = y.dropna()
+
+    # if the series is empty, we assume it to be discrete by default
+    if y_new.empty:
+        return False
+
+    # if the series is of boolean type, we consider it as discrete
+    # according to the tennis example given in class
+    if pd.api.types.is_bool_dtype(y_new):
+        return False
+
+    # if the series is numeric, we use our helper function
+    if pd.api.types.is_numeric_dtype(y_new):
+        return numeric_is_real(y_new)
+
+    # if the series is not numeric, we first try to see if it can be converted into a numeric series
+    converted = pd.to_numeric(y_new, errors="coerce").dropna()
+
+    # if 95% of the values get converted, we consider it to be numeric
+    if len(converted) >= 0.95 * len(y_new):
+        return numeric_is_real(converted)
+
+    # we return false for all other cases, as the values would not be real
+    return False
 
 
 def entropy(Y: pd.Series) -> float:
     """
-    function to calculate the entropy of a target variable Y.
-    entropy measures the impurity or uncertainty in the dataset.
+    function to calculate the entropy of a target variable Y
 
     formula: H(Y) = - Σ p_i * log2(p_i)
 
@@ -49,8 +151,7 @@ def entropy(Y: pd.Series) -> float:
 
 def gini_index(Y: pd.Series) -> float:
     """
-    function to calculate the gini index of a target variable Y.
-    gini index measures impurity based on squared probabilities.
+    function to calculate the gini index of a target variable Y
 
     formula: gini(Y) = 1 - Σ p_i^2
 
@@ -89,7 +190,7 @@ def information_gain(
     Y: pd.Series, attr: pd.Series, criterion: str = "entropy"
 ) -> float:
     """
-    function to calculate the information gain of splitting dataset Y using attribute attr.
+    function to calculate the information gain of splitting dataset Y using attribute attr
 
     Parameters:
         Y : pd.Series -> target variable
@@ -145,7 +246,7 @@ def opt_split_attribute(X: pd.DataFrame, y: pd.Series, criterion, features: pd.S
     return: attribute to split upon
     """
 
-    # According to wheather the features are real or discrete valued and the criterion, find the attribute from the features series with the maximum information gain (entropy or varinace based on the type of output) or minimum gini index (discrete output).
+    # According to whether the features are real or discrete valued and the criterion, find the attribute from the features series with the maximum information gain (entropy or variance based on the type of output) or minimum gini index (discrete output).
 
     pass
 
