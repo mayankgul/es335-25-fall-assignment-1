@@ -5,6 +5,7 @@ There is no restriction on following the below template, these fucntions are her
 
 import pandas as pd
 import numpy as np
+from typing import Tuple, Optional
 
 
 def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
@@ -169,7 +170,7 @@ def gini_index(Y: pd.Series) -> float:
     probabilities = counts / counts.sum()
 
     # apply gini formula
-    return 1 - np.sum(probabilities**2)
+    return 1 - np.sum(probabilities ** 2)
 
 
 def mse(Y: pd.Series) -> float:
@@ -199,6 +200,9 @@ def information_gain(
 
     Returns:
         float -> information gain value
+
+    Raises:
+        ValueError -> if criterion is not one of "entropy", "gain" or "mse"
     """
 
     # select impurity function based on criterion
@@ -235,20 +239,168 @@ def information_gain(
     return base_impurity - weighted_impurity
 
 
-def opt_split_attribute(X: pd.DataFrame, y: pd.Series, criterion, features: pd.Series):
+# helper function to find impurity function based on given criterion
+def find_impurity_func(criterion: str):
     """
-    Function to find the optimal attribute to split about.
-    If needed you can split this function into 2, one for discrete and one for real valued features.
-    You can also change the parameters of this function according to your implementation.
+    function to find impurity function according to given criterion
 
-    features: pd.Series is a list of all the attributes we have to split upon
+    Parameters:
+        criterion : str -> "entropy", "gini" or "mse"
 
-    return: attribute to split upon
+    Returns:
+        function -> the impurity function
+
+    Raises:
+        ValueError -> if criterion is not one of "entropy", "gini" or "mse"
     """
 
-    # According to whether the features are real or discrete valued and the criterion, find the attribute from the features series with the maximum information gain (entropy or variance based on the type of output) or minimum gini index (discrete output).
+    match criterion:
+        case "entropy":
+            return entropy
+        case "gini":
+            return gini_index
+        case "mse":
+            return  mse
+        case _:
+            return ValueError("Criterion must be one of ['entropy', 'gini', 'mse']")
 
-    pass
+
+# helper function for real input
+def best_threshold_gain(x: pd.Series, y: pd.Series, criterion: str) -> Tuple[Optional[float], float]:
+    """
+    function to find the threshold on a real-valued feature, that maximizes information gain for the
+    target variable under the given criterion
+
+    Parameters:
+        x : pd.Series -> real-valued feature
+        y : pd.Series -> target variable
+        criterion : str -> "entropy", "gini" or "mse"
+
+    Returns:
+        Tuple[float, float] -> (threshold that maximizes information gain, corresponding maximum information gain)
+    """
+
+    # for this function, we drop rows with NaN in both series
+    valid_rows = (~x.isna()) & (~y.isna())
+    x_new = x[valid_rows]
+    y_new = y[valid_rows]
+
+    # if there is one or less unique values, we cannot perform a split
+    if x_new.size == 0 or np.unique(x_new).size <= 1:
+        return None, 0.0
+
+    # for mse criterion, we check if the target variable is numeric
+    if (criterion == "mse") and (not np.issubdtype(y_new, np.number)):
+        try:
+            y_new = pd.to_numeric(y_new)
+        except Exception as e:
+            raise ValueError("For 'mse', target variable must be numeric") from e
+
+    # first we sort by feature values
+    order = np.argsort(x_new)
+    x_new = x_new[order]
+    y_new = y_new[order]
+
+    impurity_func = find_impurity_func(criterion)
+    impurity_val = impurity_func(pd.Series(y_new))
+
+    # we initialize gain and threshold values
+    best_gain = -np.inf
+    best_threshold = None
+
+    length = len(x_new)
+
+    # we can consecutive unique values
+    for i in range(1, length):
+        # there will be no threshold between same values
+        if x_new[i] == x_new[i - 1]:
+            continue
+
+        # find threshold = midpoint between consecutive distinct values
+        threshold = 0.5 * (x_new[i] + x_new[i - 1])
+
+        # we split the target variable according to the threshold
+        left_y = y_new[:i]
+        right_y = y_new[:i]
+
+        # next we compute the weighted impurity of the children
+        weight_left = i / length
+        weight_right = 1 - weight_left
+        child_impurity = (weight_left * impurity_func(pd.Series(left_y))) + (weight_right * impurity_func(pd.Series(right_y)))
+
+        gain = impurity_val - child_impurity
+        if gain > best_gain:
+            best_gain = gain
+            best_threshold = threshold
+
+    # if no valid threshold, we do not split
+    if best_gain == -np.inf:
+        return None, 0.0
+
+    # if we get small negative gain value, we consider it as 0
+    if 0 > best_gain > -1e-12:
+        best_gain = 0.0
+
+    return best_threshold, float(best_gain)
+
+
+def opt_split_attribute(X: pd.DataFrame, y: pd.Series, criterion, features: pd.Series) -> Tuple[str, Optional[float], float]:
+    """
+    function to find the best attribute and threshold (for real values) to split about
+
+    Parameters:
+        X : pd.DataFrame -> feature dataframe
+        y : pd.Series -> target variable
+        criterion : str -> "entropy", "gini" or "mse"
+        features : pd.Series -> list of attributes
+
+    Returns:
+        Tuple[str, float, float] -> (best feature, best threshold; None for discrete, best gain)
+    """
+
+    features = list(features)
+
+    # initialize to track best possible values
+    best_feature = None
+    best_threshold = None
+    best_gain = -np.inf\
+
+
+    # iterate over all features
+    for feature in features:
+        feature_values = X[feature]
+
+        # check if values are real or discrete
+        is_real = check_ifreal(feature_values)
+
+        if is_real:
+            # find best threshold if real
+            threshold, gain = best_threshold_gain(y, feature_values, criterion)
+        else:
+            # for discrete we use information gain
+            valid_rows = (~feature_values.isna()) & (~y.isna())
+            if valid_rows.sum() == 0:
+                threshold, gain = None, 0.0
+            else:
+                gain = information_gain(y[valid_rows], feature_values[valid_rows], criterion)
+                threshold = None
+
+        # we keep track of maximum gain
+        if gain > best_gain:
+            best_gain = gain
+            best_threshold = threshold
+            best_feature = feature
+
+    # if none of the splits improves the impurity, return default values
+    if best_feature is None:
+        return features[0], None, 0.0
+
+    # if gain is very small negative value consider as 0
+    if 0 > best_gain > 1e-12:
+        best_gain = 0.0
+
+    return best_feature, best_threshold, float(best_gain)
+
 
 
 def split_data(X: pd.DataFrame, y: pd.Series, attribute, value):
