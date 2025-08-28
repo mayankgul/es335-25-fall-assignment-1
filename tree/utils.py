@@ -54,13 +54,13 @@ def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
 
             continue
 
-        # everything else is also discrete
-        dummies = pd.get_dummies(row.astype("category"), prefix=column, prefix_sep="__", dummy_na=True)
-        parts.append(dummies)
+    # everything else is also discrete
+    dummies = pd.get_dummies(row.astype("category"), prefix=column, prefix_sep="__", dummy_na=True)
+    parts.append(dummies)
 
-        final = pd.concat(parts, axis=1)
+    final = pd.concat(parts, axis=1)
 
-        return final.astype(float)
+    return final.astype(float)
 
 
 
@@ -282,15 +282,15 @@ def best_threshold_gain(x: pd.Series, y: pd.Series, criterion: str) -> Tuple[Opt
 
     # for this function, we drop rows with NaN in both series
     valid_rows = (~x.isna()) & (~y.isna())
-    x_new = x[valid_rows]
-    y_new = y[valid_rows]
+    x_new = x[valid_rows].to_numpy()
+    y_new = y[valid_rows].to_numpy()
 
     # if there is one or less unique values, we cannot perform a split
     if x_new.size == 0 or np.unique(x_new).size <= 1:
         return None, 0.0
 
     # for mse criterion, we check if the target variable is numeric
-    if (criterion == "mse") and (not np.issubdtype(y_new, np.number)):
+    if (criterion == "mse") and (not np.issubdtype(np.asarray(y_new).dtype, np.number)):
         try:
             y_new = pd.to_numeric(y_new)
         except Exception as e:
@@ -321,7 +321,7 @@ def best_threshold_gain(x: pd.Series, y: pd.Series, criterion: str) -> Tuple[Opt
 
         # we split the target variable according to the threshold
         left_y = y_new[:i]
-        right_y = y_new[:i]
+        right_y = y_new[i:]
 
         # next we compute the weighted impurity of the children
         weight_left = i / length
@@ -375,7 +375,7 @@ def opt_split_attribute(X: pd.DataFrame, y: pd.Series, criterion, features: pd.S
 
         if is_real:
             # find best threshold if real
-            threshold, gain = best_threshold_gain(y, feature_values, criterion)
+            threshold, gain = best_threshold_gain(feature_values, y, criterion)
         else:
             # for discrete we use information gain
             valid_rows = (~feature_values.isna()) & (~y.isna())

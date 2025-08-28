@@ -157,8 +157,8 @@ class DecisionTree:
         # we fill split info for the node
         node.feature = feat_name
         node.threshold = float(threshold) if threshold is not None else None
-        node.left = self.build_node(X_left, y_left, depth + 1)
-        node.right = self.build_node(X_right, y_right, depth + 1)
+        node.left = self.build_node(X_left, y_left, depth + 1, node_impurity_function, criterion_name)
+        node.right = self.build_node(X_right, y_right, depth + 1, node_impurity_function, criterion_name)
         return node
 
 
