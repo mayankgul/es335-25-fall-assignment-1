@@ -276,9 +276,83 @@ class DecisionTree:
         return pd.Series(prediction, index=X.index, name="prediction")
 
 
+    # function to pretty print numbers
+    def fmt_num(self, x: float) -> str:
+        """
+        function to pretty print numbers with a few significant digits
+        """
+        try:
+            return f"{float(x):.6g}"
+        except Exception:
+            return str(x)
+
+    # helper function to render the node split
+    def condition_str(self, node: TreeNode) -> str:
+        """
+        function to render the node's split in the format as required
+        """
+
+        if node.feature is None or node.threshold is None:
+            return "?(unknown split)"
+
+        threshold = float(node.threshold)
+
+        if abs(threshold - 0.5) <= 1e-9:
+            return f"?({node.feature} == 1)"
+
+        return f"?({node.feature} > {self.fmt_num(threshold)})"
+
+    # function to render a leaf prediction
+    def leaf_str(self, node: TreeNode) -> str:
+        """
+        function to render a leaf prediction
+        """
+
+        pred = node.prediction
+        if self.task == "regression":
+            return self.fmt_num(pred)
+        # classification
+        return f"Class {pred}"
+
+    # helper function to render the lines to be displayed
+    def render(self, node: TreeNode, indent: int, preface: str | None = None) -> list[str]:
+        padding = "    " * indent
+        lines: list[str] = []
+
+        if node.is_leaf:
+            leaf = self.leaf_str(node)
+
+            if preface:
+                lines.append(f"{padding}{preface} {leaf}")
+            else:
+                lines.append(f"{padding}{leaf}")
+            return lines
+
+        # if it is an internal node, we write the condition in one line
+        cond = self.condition_str(node)
+        if preface:
+            lines.append(f"{padding}{preface} {cond}")
+        else:
+            lines.append(f"{padding}{cond}")
+
+        # for a right child
+        if node.right is not None:
+            lines.extend(self.render(node.right, indent + 1, "Y:"))
+        else:
+            lines.append(f"{'    ' * (indent + 1)}Y: (empty)")
+
+        # for left child
+        if node.left is not None:
+            lines.extend(self.render(node.left, indent + 1, "N:"))
+        else:
+            lines.append(f"{'    ' * (indent + 1)}N: (empty)")
+
+        return lines
+
+
     def plot(self) -> None:
         """
-        Function to plot the tree
+        function to plot the tree
 
         Output Example:
         ?(X1 > 4)
@@ -288,4 +362,7 @@ class DecisionTree:
             N: Class C
         Where Y => Yes and N => No
         """
-        pass
+
+        # generate lines using helper functions and print the tree
+        text_lines = self.render(self.root, indent=0, preface=None)
+        print("\n".join(text_lines))
