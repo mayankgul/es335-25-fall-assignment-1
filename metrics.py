@@ -149,5 +149,5 @@ def mae(y_hat: pd.Series, y: pd.Series) -> float:
     true = y_num.to_numpy(dtype=np.float64)
 
     abs_err = np.abs(pred - true)
-    return float(np.mean(abs_err))    
+    return float(np.mean(abs_err))
 
