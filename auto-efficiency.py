@@ -20,7 +20,7 @@ data = pd.read_csv(url, delim_whitespace=True, header=None,
 
 # we drop the free text 'car name' for regression
 df = data.copy()
-df = df.drop(columns=["car_name"])
+df = df.drop(columns=["car name"])
 
 # 'horsepower' has ? placeholders so we need to coerce to numeric and not consider NaN values
 df["horsepower"] = pd.to_numeric(df["horsepower"], errors="coerce")

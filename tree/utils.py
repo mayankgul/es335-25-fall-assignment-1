@@ -5,7 +5,7 @@ There is no restriction on following the below template, these fucntions are her
 
 import pandas as pd
 import numpy as np
-from typing import Tuple, Optional, Any
+from typing import Tuple, Optional, Any, Union
 
 
 def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
@@ -39,12 +39,12 @@ def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
             continue
 
         # floating point values are considered real
-        if pd.api.types.is_float_dtype(row):
+        elif pd.api.types.is_float_dtype(row):
             parts.append(row.astype(float).to_frame(column))
             continue
 
         # we use our threshold value to decide if integer values are discrete or real
-        if pd.api.types.is_integer_dtype(row):
+        elif pd.api.types.is_integer_dtype(row):
             unique_count = row.dropna().nunique()
             if unique_count < threshold:
                 dummies = pd.get_dummies(row.astype("category"), prefix=column, prefix_sep="__", dummy_na=True)
@@ -53,15 +53,29 @@ def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
                 parts.append(row.astype(float).to_frame(column))
 
             continue
-
-    # everything else is also discrete
-    dummies = pd.get_dummies(row.astype("category"), prefix=column, prefix_sep="__", dummy_na=True)
-    parts.append(dummies)
+        else:
+            # everything else is also discrete
+            dummies = pd.get_dummies(row.astype("category"), prefix=column, prefix_sep="__", dummy_na=True)
+            parts.append(dummies)
 
     final = pd.concat(parts, axis=1)
 
     return final.astype(float)
 
+def as_series_1d(x: Union[pd.Series, np.ndarray, list, tuple, pd.Index, Any]) -> pd.Series:
+    if isinstance(x, pd.Series):
+        return x
+    if isinstance(x, pd.DataFrame):
+        if x.shape[1] == 1:
+            return x.iloc[:, 0]
+        raise TypeError(
+            f"check_ifreal expected a 1-D vector/Series, got a DataFrame with shape {x.shape}"
+        )
+    try:
+        return pd.Series(x)
+    except Exception:
+        # last resort: wrap scalar
+        return pd.Series([x])
 
 
 def numeric_is_real(y: pd.Series) -> bool:
@@ -75,6 +89,7 @@ def numeric_is_real(y: pd.Series) -> bool:
         bool -> True if series has real values, False otherwise
     """
 
+    y = as_series_1d(y)
     # if the values in the series are floating point, we consider it as real
     if pd.api.types.is_float_dtype(y):
         return True
@@ -101,7 +116,9 @@ def check_ifreal(y: pd.Series) -> bool:
     """
 
     # we first remove the NaN values from the series
-    y_new = y.dropna()
+
+    y_new = as_series_1d(y).dropna()
+
 
     # if the series is empty, we assume it to be discrete by default
     if y_new.empty:
